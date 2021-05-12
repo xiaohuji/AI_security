@@ -175,11 +175,20 @@ def ana_label_api_num(path, nrows):
 def ana_label_api_ratio(path, nrows):
     data = pd.read_csv(path, nrows=nrows)
     feat = ana_label_api_num(path, nrows)
+    feat = feat.set_index('file_id')
+    # print('--------------------------')
+    # print(feat)
     tmp = data.groupby(['file_id']).api.count()
     feat_rate = pd.concat([feat, tmp], axis=1)
     feat_rate = feat_rate.apply(lambda x: x / feat_rate.api)
+    # print(feat_rate)
     feat_rate.columns = [feat_rate.columns[i] + '_rate' for i in range(feat_rate.shape[1])]
+    # print('--------------------------')
+    # print(feat_rate.columns)
+    # feat_rate.columns[feat_rate.columns[0]] = 'file_id'
+    # print(feat_rate.columns)
     feat_rate_withFileid = feat_rate.reset_index().drop(['api_rate'], axis=1)
+    # print(feat_rate_withFileid)
     return feat_rate_withFileid
 # ---------------------------------TF-IDF-OVR-NB-LR------------------------------------------
 def tfidfModelTrain(train_path, test_path, train_n, test_n):
@@ -191,8 +200,8 @@ def tfidfModelTrain(train_path, test_path, train_n, test_n):
                               use_idf=1, smooth_idf=1, sublinear_tf=1)
     tr_api = train.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()
     te_api = test.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()
-    tr_api_vec = api_vec.fit_transform(tr_api['api'])
-    val_api_vec = api_vec.transform(te_api['api'])
+    tr_tfidf_rlt = api_vec.fit_transform(tr_api['api'])
+    te_tfidf_rlt = api_vec.transform(te_api['api'])
     return tr_tfidf_rlt, te_tfidf_rlt
 # NB-LR
 def pr(x, y_i, y):
@@ -207,7 +216,9 @@ def get_mdl(x, y):
     r = np.log(pr(x, 1, y) / pr(x, 0, y))
     x_nb = x.multiply(r)
     np.random.seed(0)
-    m = LogisticRegression(C=6, dual=True, random_state=0)
+    m = LogisticRegression(C=6, dual=True, random_state=0, solver='liblinear')
+    # print(x_nb)
+    # print(y)
     return m.fit(x_nb, y), r
 
 
@@ -229,7 +240,7 @@ def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n):
                 print('fit', j)
                 m, r = get_mdl(x, tr['label'] == j)
                 preds[:, i] = m.predict_proba(test_x.multiply(r))[:, 1]
-                preds_te_i[:, i] =preds_te_i[:, i] + m.predict_proba(te_tfidf_rlt.multiply(r))[:, 1]
+                preds_te[:, i] =preds_te[:, i] + m.predict_proba(te_tfidf_rlt.multiply(r))[:, 1]
 
             preds_lr = preds
             lr_oof_i = pd.DataFrame({'file_id': val['file_id']})
@@ -237,16 +248,19 @@ def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n):
                 lr_oof_i['prob' + str(i)] = preds[:, i]
             lr_oof_tr = pd.concat([lr_oof_tr, lr_oof_i], axis=0)
 
-            # 归一化后 测试一下
-            for i, j in enumerate(preds_lr):
-                preds_lr[i] = j / sum(j)
-            log_loss_i = log_loss(val['label'], preds_lr)
-            print('log_loss_i', log_loss_i)
-            # label_fold.append(val['label'].tolist())
-            # preds_fold_lr.append(preds_lr)
+            # # 8种的时候要归一化，归一化后 测试一下
+            # for i, j in enumerate(preds_lr):
+            #     preds_lr[i] = j / sum(j)
+            # print(val['label'].values)
+            # print(preds_lr)
+            # log_loss_i = log_loss(val['label'], preds_lr)
+            # print('log_loss_i', log_loss_i)
+            # # label_fold.append(val['label'].tolist())
+            # # preds_fold_lr.append(preds_lr)
     # 五折后顺序是乱的
     lr_oof_tr = lr_oof_tr.sort_values('file_id')
-    preds_te_avg = preds_te / 5
+    print(preds_te)
+    preds_te_avg = preds_te / 5.0
     lr_oof_te = pd.DataFrame({'file_id': range(0, te_tfidf_rlt.shape[0])})
     for i in range(ovr_n):
         lr_oof_te['prob' + str(i)] = preds_te_avg[:, i]
@@ -255,33 +269,35 @@ def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n):
 
 
 if __name__ == '__main__':
-    path = './security_train/security_train.csv'
-    path1 = './security_train/security_train.csv'
-    path2 = './security_test/security_test.csv'
+    path = './data/security_train2.csv'
+    path1 = './data/security_train.csv'
+    path2 = './data/security_test.csv'
     # read_train_file(path1, 200000)
     # read_test_file(path2, 200000)
     # load_train2h5py(path="security_train.csv.txt")
-
+    #
     # ana_top_n(path, 20000000, 5)
     # ana_top_api(path, 10000000)
-
-    train_1 = ana_label_tid_api(path, 200000)
-    train_2 = ana_label_tidapi_max_min_mean(path, 200000)
-    test_1 = ana_label_tid_api(path2, 200000)
-    test_2 = ana_label_tidapi_max_min_mean(path2, 200000)
+    train_num = 10000000
+    test_num = 10000000
+    print('feature')
+    train_1 = ana_label_tid_api(path, train_num)
+    train_2 = ana_label_tidapi_max_min_mean(path,train_num)
+    test_1 = ana_label_tid_api(path2, test_num)
+    test_2 = ana_label_tidapi_max_min_mean(path2, test_num)
 
     train = train_1.merge(train_2, on=['file_id'], how='left')
     test = test_1.merge(test_2, on=['file_id'], how='left')
-
-    train_3 = ana_label_api_first_index(path, 200000)
-    train_4 = ana_label_api_num(path, 200000)
-    train_5 = ana_label_api_ratio(path, 200000)
+    print('feature_pivot')
+    train_3 = ana_label_api_first_index(path, train_num)
+    train_4 = ana_label_api_num(path, train_num)
+    train_5 = ana_label_api_ratio(path, train_num)
     train_pi = train_3.merge(train_4, on=['file_id'], how='left')
     train_pi = train_pi.merge(train_5, on=['file_id'], how='left')
 
-    test_3 = ana_label_api_first_index(path2, 200000)
-    test_4 = ana_label_api_num(path2, 200000)
-    test_5 = ana_label_api_ratio(path2, 200000)
+    test_3 = ana_label_api_first_index(path2, test_num)
+    test_4 = ana_label_api_num(path2, test_num)
+    test_5 = ana_label_api_ratio(path2, test_num)
     test_pi = test_3.merge(test_4, on=['file_id'], how='left')
     test_pi = test_pi.merge(test_5, on=['file_id'], how='left')
 
@@ -291,11 +307,12 @@ if __name__ == '__main__':
     train = train.merge(train_pi, on=['file_id'], how='left')
     test = test.merge(test_pi, on=['file_id'], how='left')
 
-    tr_tfidf_rlt, te_tfidf_rlt = tfidfModelTrain(path, path2, 200000, 200000)
-    lr_oof_tr, lr_oof_te = nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train_1, ovr_n=1)
+    print("---tfidf---")
+    tr_tfidf_rlt, te_tfidf_rlt = tfidfModelTrain(path, path2, train_num, test_num)
+    lr_oof_tr, lr_oof_te = nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train_1, ovr_n=8)
 
     # 这个ovr_n要改
-    prob_list = ['prob' + str(i) for i in range(1)]
+    prob_list = ['prob' + str(i) for i in range(8)]
     train = pd.concat(
         [train, lr_oof_tr[prob_list]], axis=1)
     test = pd.concat(
@@ -304,17 +321,17 @@ if __name__ == '__main__':
     print('[TRAIN SIZE]: ', train.shape)
     print('[TEST SIZE]: ', test.shape)
 
-    train.to_csv('/data/train_features_all.csv', index=None)
-    test.to_csv('/data/test_features_all.csv', index=None)
+    train.to_csv('./data/train_features_all.csv', index=None)
+    test.to_csv('./data/test_features_all.csv', index=None)
 
-    tr_X = train.drop(['`file_id', 'label'], axis=1)
-    tr_y = train['label']
-    print('[TRAIN FEATURE SIZE]: ', tr_X.shape)
-    print('[TRAIN LABEL DISTRIBUTION]: ')
-    print(tr_y.value_counts())
-
-    te_X = test.drop(['file_id', 'label'], axis=1)
-    te_y = test['label']
-    print('[TEST FEATURE SIZE]: ', te_X.shape)
-    print('[TEST LABEL DISTRIBUTION]: ')
-    print(te_y.value_counts())
+    # tr_X = train.drop(['`file_id', 'label'], axis=1)
+    # tr_y = train['label']
+    # print('[TRAIN FEATURE SIZE]: ', tr_X.shape)
+    # print('[TRAIN LABEL DISTRIBUTION]: ')
+    # print(tr_y.value_counts())
+    #
+    # te_X = test.drop(['file_id', 'label'], axis=1)
+    # te_y = test['label']
+    # print('[TEST FEATURE SIZE]: ', te_X.shape)
+    # print('[TEST LABEL DISTRIBUTION]: ')
+    # print(te_y.value_counts())
