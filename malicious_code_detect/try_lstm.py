@@ -1,21 +1,23 @@
 import pickle
-from keras.preprocessing.sequence import pad_sequences
-from keras_preprocessing.text import Tokenizer
-from keras.models import Sequential, Model
-from keras.layers import Dense, Embedding, Activation, merge, Input, Lambda, Reshape, LSTM, RNN, \
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Dense, Embedding, Activation, Input, Lambda, concatenate, Reshape, LSTM, RNN, \
     SimpleRNNCell, SpatialDropout1D, Add, Maximum
-from keras.layers.cudnn_recurrent import CuDNNLSTM
-from keras.layers import Conv1D, Flatten, Dropout, MaxPool1D, GlobalAveragePooling1D, concatenate, AveragePooling1D
-from keras import optimizers
-from keras import regularizers
-from keras.layers import BatchNormalization
-from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-from keras.utils import to_categorical
+from tensorflow.keras.layers import Conv1D, Flatten, Dropout, MaxPool1D, GlobalAveragePooling1D, concatenate, AveragePooling1D
+# from tensorflow.keras import optimizers
+# from tensorflow.keras import regularizers
+# from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.utils import to_categorical
 import time
 import numpy as np
-from keras import backend as K
+from tensorflow.keras import backend as K
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
+import tensorflow as tf
+# import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 # with open('datasets.pkl', 'wb') as f:
@@ -31,32 +33,32 @@ import pandas as pd
 #     # y_train = pickle.load(f)
 #     # y_test = pickle.load(f)
 #     labels = pickle.load(f)
-maxlen = 6000
+maxlen = 600
 
-def mulitl_version_lstm():
-    embed_size = 256
-    num_filters = 64
-    kernel_size = [3, 5, 7]
-    main_input = Input(shape=(maxlen,))
-    emb = Embedding(304, 256, input_length=maxlen)(main_input)
-    # _embed = SpatialDropout1D(0.15)(emb)
-    warppers = []
-    warppers2 = []  # 0.42
-    warppers3 = []
-    for _kernel_size in kernel_size:
-        conv1d = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(emb)
-        warppers.append(AveragePooling1D(2)(conv1d))
-    for (_kernel_size, cnn) in zip(kernel_size, warppers):
-        conv1d_2 = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(cnn)
-        warppers2.append(AveragePooling1D(2)(conv1d_2))
-    for (_kernel_size, cnn) in zip(kernel_size, warppers2):
-        conv1d_2 = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(cnn)
-        warppers3.append(AveragePooling1D(2)(conv1d_2))
-    fc = Maximum()(warppers3)
-    rl = CuDNNLSTM(512)(fc)
-    main_output = Dense(8, activation='softmax')(rl)
-    model = Model(inputs=main_input, outputs=main_output)
-    return model
+# def mulitl_version_lstm():
+#     embed_size = 256
+#     num_filters = 64
+#     kernel_size = [3, 5, 7]
+#     main_input = Input(shape=(maxlen,))
+#     emb = Embedding(304, 256, input_length=maxlen)(main_input)
+#     # _embed = SpatialDropout1D(0.15)(emb)
+#     warppers = []
+#     warppers2 = []  # 0.42
+#     warppers3 = []
+#     for _kernel_size in kernel_size:
+#         conv1d = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(emb)
+#         warppers.append(AveragePooling1D(2)(conv1d))
+#     for (_kernel_size, cnn) in zip(kernel_size, warppers):
+#         conv1d_2 = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(cnn)
+#         warppers2.append(AveragePooling1D(2)(conv1d_2))
+#     for (_kernel_size, cnn) in zip(kernel_size, warppers2):
+#         conv1d_2 = Conv1D(filters=num_filters, kernel_size=_kernel_size, activation='relu', padding='same')(cnn)
+#         warppers3.append(AveragePooling1D(2)(conv1d_2))
+#     fc = Maximum()(warppers3)
+#     rl = LSTM(512)(fc)
+#     main_output = Dense(8, activation='softmax')(rl)
+#     model = Model(inputs=main_input, outputs=main_output)
+#     return model
 
 
 def Build():
@@ -80,7 +82,7 @@ def Build():
     conv1_2 = Conv1D(64, 3, padding='same', activation='relu')(conv1_1)
 
     cnn1 = MaxPool1D(pool_size=2)(conv1_2)
-    rl = CuDNNLSTM(256)(cnn1)
+    rl = LSTM(256)(cnn1)
     # flat = Flatten()(cnn3)
     # drop = Dropout(0.5)(flat)
     fc = Dense(256)(rl)
@@ -90,9 +92,11 @@ def Build():
     return model
 
 def main(train_path, test_path, train_n, test_n):
-    config = K.tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    session = K.tf.Session(config=config)
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    print('GPU: ', gpus)
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+    # session = tf.compat.v1.keras.backend.setSession(config=config)
 
     Fname = 'malware_'
     Time = Fname + str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
@@ -101,13 +105,19 @@ def main(train_path, test_path, train_n, test_n):
 
     train = pd.read_csv(train_path, nrows=train_n)
     test = pd.read_csv(test_path, nrows=test_n)
-    test2 = test.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()
-    outfiles = test2
-    file_names = test2
-    train2 = train.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()
-    labels = train2
-    labels_d = train2
-    files = train2
+    outfiles = test.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
+    # file_names = test2
+    files = train.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
+    # print(files)
+    # print(np.shape(files))
+    # labels = train.groupby(['file_id', 'label'])['label'].reset_index()
+    labels = train[['file_id', 'label']].drop_duplicates().label.tolist()
+    # print(labels)
+    # print(np.shape(labels))
+    # labels = train.groupby('file_id')['label'].apply(lambda x: ''.join(x)).reset_index()
+    # enumerate用
+    labels_d = labels.copy()
+
 
 
 
@@ -116,14 +126,15 @@ def main(train_path, test_path, train_n, test_n):
     #
 
     labels = np.asarray(labels)
-
+    # 将类别向量转换为二进制
     labels = to_categorical(labels, num_classes=8)
 
     tokenizer = Tokenizer(num_words=None,
                           filters='!"#$%&()*+,-./:;<=>?@[\]^_`{|}~',
                           split=' ',
                           char_level=False,
-                          oov_token=None)
+                          oov_token=None,
+                          lower=False)
     tokenizer.fit_on_texts(files)
     tokenizer.fit_on_texts(outfiles)
 
@@ -131,7 +142,7 @@ def main(train_path, test_path, train_n, test_n):
     #     pickle.dump(tokenizer, f)
 
     vocab = tokenizer.word_index
-    print(tokenizer.word_index)
+    print(vocab)
     print(len(vocab))
     x_train_word_ids = tokenizer.texts_to_sequences(files)
     x_out_word_ids = tokenizer.texts_to_sequences(outfiles)
