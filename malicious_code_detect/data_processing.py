@@ -7,6 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import label_binarize
+from sklearn.metrics import accuracy_score
 
 
 def read_train_file(path, nrows):
@@ -143,9 +145,10 @@ def ana_label_tidapi_max_min_mean (path, nrows):
     feat = feat_tmp.groupby(['file_id']).index.agg(['max', 'min', 'mean']).reset_index()
     # print(feat)
     feat.columns = ['file_id', 'tid_api_cnt_max', 'tid_api_cnt_min', 'tid_api_cnt_mean']
+    return_data = feat.merge(feat, on='file_id', how='left')
     feat = feat_tmp.groupby(['file_id'])['api'].agg(['max', 'min', 'mean']).reset_index()
     feat.columns = ['file_id', 'tid_api_distinct_cnt_max', 'tid_api_distinct_cnt_min', 'tid_api_distinct_cnt_mean']
-    return_data = feat.merge(feat, on='file_id', how='left')
+    return_data = return_data.merge(feat, on='file_id', how='left')
     return return_data
 # ------------------下面是用透视表的--------------------------------------------------------------------
 #每个api第一次调用的Index
@@ -222,7 +225,7 @@ def get_mdl(x, y):
     return m.fit(x_nb, y), r
 
 
-def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n):
+def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n, test):
     label_fold = []
     preds_fold_lr = []
     preds_te = np.zeros((te_tfidf_rlt.shape[0], ovr_n))
@@ -261,6 +264,19 @@ def nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train, ovr_n):
     lr_oof_tr = lr_oof_tr.sort_values('file_id')
     print(preds_te)
     preds_te_avg = preds_te / 5.0
+    te_labels = test['label'].values
+    y_true = label_binarize(te_labels, classes=[0, 1, 2, 3, 4, 5, 6, 7])
+
+    loss = log_loss(y_true, preds_te_avg)
+    print('log_loss', loss)
+    test_x = np.argmax(preds_te_avg, axis=1)
+    # for i in range(len(meta_test)):
+    #         max_value=max(meta_test[i])
+    #         test_x.append(meta_test[i].index(max_value))
+    print('test_x ', test_x)
+    print('right_x', te_labels)
+    accuracy = accuracy_score(te_labels, test_x)
+    print('accuracy_score', accuracy)
     lr_oof_te = pd.DataFrame({'file_id': range(0, te_tfidf_rlt.shape[0])})
     for i in range(ovr_n):
         lr_oof_te['prob' + str(i)] = preds_te_avg[:, i]
@@ -309,7 +325,7 @@ if __name__ == '__main__':
 
     print("---tfidf---")
     tr_tfidf_rlt, te_tfidf_rlt = tfidfModelTrain(path, path2, train_num, test_num)
-    lr_oof_tr, lr_oof_te = nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train_1, ovr_n=8)
+    lr_oof_tr, lr_oof_te = nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train_1, ovr_n=8, test=test_1)
 
     # 这个ovr_n要改
     prob_list = ['prob' + str(i) for i in range(8)]

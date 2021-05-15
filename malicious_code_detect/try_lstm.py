@@ -197,10 +197,10 @@ def main(train_path, test_path, train_n, test_n):
         pickle.dump(meta_train, f)
         pickle.dump(meta_test, f)
 if __name__ == '__main__':
-    path = './security_train/security_train.csv'
+    path = './data/security_train.csv'
     path1 = './security_train/security_train.csv'
-    path2 = './security_test/security_test.csv'
-    main(path, path2, 200000, 200000)
+    path2 = './data/security_test.csv'
+    main(path, path2, 10000000, 10000000)
 
     # result = model.predict(x_out_padded_seqs)
     # out = []

@@ -3,6 +3,10 @@ import numpy as np
 from sklearn.metrics import log_loss
 from sklearn.model_selection import StratifiedKFold
 import xgboost as xgb
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import label_binarize
+from sklearn.metrics import accuracy_score
 
 def xgbMultiTrain(X_train, X_val, y_train, y_val, test, num_round):
     # multi-cls model
@@ -50,6 +54,10 @@ def main(ovr_n, n_round):
     print('[TEST LABEL DISTRIBUTION]: ')
     print(te_y.value_counts())
 
+    plt.figure(figsize=[10, 8])
+    sns.heatmap(train_data.iloc[:1600, 1:12].corr())
+    plt.show()
+
     print('5-Fold Multi-Class Model Training')
     # Variables
     logloss_rlt = []
@@ -57,7 +65,7 @@ def main(ovr_n, n_round):
     p_test_all = pd.DataFrame(np.zeros((te_X.shape[0], 8)))
     model = ''
     # Start 5-fold CV
-    skf = StratifiedKFold(n_splits=2, random_state=4, shuffle=True)
+    skf = StratifiedKFold(n_splits=5, random_state=4, shuffle=True)
     for fold_i, (tr_index, val_index) in enumerate(skf.split(tr_X, tr_y)):
         print('FOLD -', fold_i, ' Start...')
         # Prepare train, val dataset
@@ -66,6 +74,9 @@ def main(ovr_n, n_round):
         # Train model
         model, p_val, p_test = xgbMultiTrain(X_train, X_val, y_train, y_val, te_X, n_round)
         # Evaluate Model and Concatenate Val-Prediction
+        print('--------------------------------------------------')
+        print(y_val)
+        print(p_val)
         m_log_loss = log_loss(y_val, p_val)
         print('----------------log_loss : ', m_log_loss, ' ---------------------')
         logloss_rlt = logloss_rlt + [m_log_loss]
@@ -73,16 +84,21 @@ def main(ovr_n, n_round):
         p_val_all = pd.concat([p_val_all, truth_prob_df], axis=0)
         # Predict Test Dataset
         p_test_all = p_test_all + 0.2 * p_test
-    type(p_test_all)
+    print(type(p_test_all))
     print('Evaluation')
     print('[LOGLOSS]: ', logloss_rlt)
     print('[LOGLOSS MEAN]: ', log_loss(p_val_all.iloc[:, 0], p_val_all.iloc[:, 1:]))
+    acc_p_test = np.argmax(p_test_all.values, axis=1)
+    accuracy = accuracy_score(te_y.values, acc_p_test)
+    print('[ACCURACY]: ', accuracy)
     # print('[LOGLOSS STD]: ', np.std(logloss_rlt))
     print('[LOGLOSS STD]: ', pd.Series(logloss_rlt).std())
     feat_imp = pd.Series(model.get_fscore()).sort_values(ascending=False)
     print('[TOP20 IMPORTANT FEATURES(5TH-FOLD MODEL)]: ')
-    print(feat_imp[:20])
-
+    print(feat_imp[0:20])
+    # g = sns.barplot(x=feat_imp.index[0:20], y=feat_imp[0:20])
+    # g.set_xticklabels(g.get_xticklabels(), rotation=90)
+    # plt.show()
     print('SUBMIT CHECK')
     rlt = pd.concat([test_data['file_id'], p_test_all], axis=1)
     prob_list = ['prob' + str(i) for i in range(ovr_n)]
@@ -97,4 +113,4 @@ def main(ovr_n, n_round):
 
 
 if __name__ == '__main__':
-    main(8, 100)
+    main(8, 2000)
