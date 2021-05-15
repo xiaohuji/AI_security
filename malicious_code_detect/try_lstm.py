@@ -5,9 +5,6 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Embedding, Activation, Input, Lambda, concatenate, Reshape, LSTM, RNN, \
     SimpleRNNCell, SpatialDropout1D, Add, Maximum
 from tensorflow.keras.layers import Conv1D, Flatten, Dropout, MaxPool1D, GlobalAveragePooling1D, concatenate, AveragePooling1D
-# from tensorflow.keras import optimizers
-# from tensorflow.keras import regularizers
-# from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.utils import to_categorical
 import time
@@ -16,7 +13,7 @@ from tensorflow.keras import backend as K
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 import tensorflow as tf
-import sklearn
+from sklearn.metrics import accuracy_score
 # import os
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -182,15 +179,19 @@ def main(train_path, test_path, train_n, test_n):
         K.clear_session()
 
     meta_test /= 5.0
-
-    with open("cnn_lstm_result.csv", 'wb') as f:
-        pickle.dump(meta_train, f)
-        pickle.dump(meta_test, f)
+    print('meta_test: ', meta_test)
+    acc_p_test = np.argmax(meta_test, axis=1)
+    accuracy = accuracy_score(outlabels, acc_p_test)
+    print('[ACCURACY]: ', accuracy)
+    meta_test.to_csv('./submit/lstm_rlt_TEST.csv', index=None)
+    # with open("cnn_lstm_result.csv", 'wb') as f:
+    #     pickle.dump(meta_train, f)
+    #     pickle.dump(meta_test, f)
 if __name__ == '__main__':
-    path = './security_train/security_train.csv'
+    path = './data/security_train.csv'
     path1 = './security_train/security_train.csv'
-    path2 = './security_test/security_test.csv'
-    main(path, path, 2000000, 2000000)
+    path2 = './data/security_test.csv'
+    main(path, path2, 20000000, 10000000)
 
     # result = model.predict(x_out_padded_seqs)
     # out = []
