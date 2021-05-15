@@ -3,9 +3,6 @@ import numpy as np
 from sklearn.metrics import log_loss
 from sklearn.model_selection import StratifiedKFold
 import xgboost as xgb
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import label_binarize
 from sklearn.metrics import accuracy_score
 
 def xgbMultiTrain(X_train, X_val, y_train, y_val, test, num_round):
@@ -54,9 +51,9 @@ def main(ovr_n, n_round):
     print('[TEST LABEL DISTRIBUTION]: ')
     print(te_y.value_counts())
 
-    plt.figure(figsize=[10, 8])
-    sns.heatmap(train_data.iloc[:1600, 1:12].corr())
-    plt.show()
+    # plt.figure(figsize=[10, 8])
+    # sns.heatmap(train_data.iloc[:1600, 1:12].corr())
+    # plt.show()
 
     print('5-Fold Multi-Class Model Training')
     # Variables
@@ -103,13 +100,13 @@ def main(ovr_n, n_round):
     rlt = pd.concat([test_data['file_id'], p_test_all], axis=1)
     prob_list = ['prob' + str(i) for i in range(ovr_n)]
     rlt.columns = ['file_id'] + prob_list
-    # check_flag = all(rlt.iloc[:, 1:].sum(axis=1) - 1 < 1e-6)
-    # if check_flag:
-    #     print('RESULT IS OK...')
-    #     rlt.to_csv('./submit/rlt_TEST.csv', index=None)
-    #     print('RESULT SAVED...')
-    # else:
-    #     print('RESULT IS WRONG!')
+    check_flag = all(rlt.iloc[:, 1:].sum(axis=1) - 1 < 1e-6)
+    if check_flag:
+        print('RESULT IS OK...')
+        rlt.to_csv('./submit/rlt_TEST.csv', index=None)
+        print('RESULT SAVED...')
+    else:
+        print('RESULT IS WRONG!')
 
 
 if __name__ == '__main__':

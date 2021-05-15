@@ -327,7 +327,6 @@ if __name__ == '__main__':
     tr_tfidf_rlt, te_tfidf_rlt = tfidfModelTrain(path, path2, train_num, test_num)
     lr_oof_tr, lr_oof_te = nblrTrain(tr_tfidf_rlt, te_tfidf_rlt, train_1, ovr_n=8, test=test_1)
 
-    # 这个ovr_n要改
     prob_list = ['prob' + str(i) for i in range(8)]
     train = pd.concat(
         [train, lr_oof_tr[prob_list]], axis=1)
@@ -339,15 +338,3 @@ if __name__ == '__main__':
 
     train.to_csv('./data/train_features_all.csv', index=None)
     test.to_csv('./data/test_features_all.csv', index=None)
-
-    # tr_X = train.drop(['`file_id', 'label'], axis=1)
-    # tr_y = train['label']
-    # print('[TRAIN FEATURE SIZE]: ', tr_X.shape)
-    # print('[TRAIN LABEL DISTRIBUTION]: ')
-    # print(tr_y.value_counts())
-    #
-    # te_X = test.drop(['file_id', 'label'], axis=1)
-    # te_y = test['label']
-    # print('[TEST FEATURE SIZE]: ', te_X.shape)
-    # print('[TEST LABEL DISTRIBUTION]: ')
-    # print(te_y.value_counts())
