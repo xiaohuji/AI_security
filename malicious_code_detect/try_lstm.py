@@ -16,23 +16,11 @@ from tensorflow.keras import backend as K
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 import tensorflow as tf
+import sklearn
 # import os
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
-# with open('datasets.pkl', 'wb') as f:
-#     pickle.dump(x_train_padded_seqs, f)
-#     pickle.dump(x_out_padded_seqs, f)
-#     pickle.dump(labels, f)
-
-
-# with open('datasets.pkl', 'rb') as f:
-#     x_train_padded_seqs = pickle.load(f)
-#     # x_test_padded_seqs = pickle.load(f)
-#     x_out_padded_seqs = pickle.load(f)
-#     # y_train = pickle.load(f)
-#     # y_test = pickle.load(f)
-#     labels = pickle.load(f)
 maxlen = 600
 
 # def mulitl_version_lstm():
@@ -106,6 +94,7 @@ def main(train_path, test_path, train_n, test_n):
     train = pd.read_csv(train_path, nrows=train_n)
     test = pd.read_csv(test_path, nrows=test_n)
     outfiles = test.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
+    outlabels = test[['file_id', 'label']].drop_duplicates().label.tolist()
     # file_names = test2
     files = train.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
     # print(files)
@@ -185,22 +174,23 @@ def main(train_path, test_path, train_n, test_n):
             # model.save('./model/model_weight_cnn_lstm_{}.h5'.format(str(i)))
             model.load_weights(model_save_path)
             # model = load_model('model_weight.h5')
-        pred_val = model.predict(X_val)
-        pred_test = model.predict(x_out_padded_seqs)
+        pred_val = model(X_val)
+        pred_test = model(x_out_padded_seqs)
 
         meta_train[te_ind] = pred_val
         meta_test += pred_test
         K.clear_session()
 
     meta_test /= 5.0
-    with open("cnn_lstm_result.pkl", 'wb') as f:
+
+    with open("cnn_lstm_result.csv", 'wb') as f:
         pickle.dump(meta_train, f)
         pickle.dump(meta_test, f)
 if __name__ == '__main__':
-    path = './data/security_train.csv'
+    path = './security_train/security_train.csv'
     path1 = './security_train/security_train.csv'
-    path2 = './data/security_test.csv'
-    main(path, path2, 10000000, 10000000)
+    path2 = './security_test/security_test.csv'
+    main(path, path, 2000000, 2000000)
 
     # result = model.predict(x_out_padded_seqs)
     # out = []
