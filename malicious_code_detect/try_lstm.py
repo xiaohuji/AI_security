@@ -67,10 +67,10 @@ def Build():
     conv1_2 = Conv1D(64, 3, padding='same', activation='relu')(conv1_1)
 
     cnn1 = MaxPool1D(pool_size=2)(conv1_2)
-    rl = LSTM(256)(cnn1)
+    rl = LSTM(64)(cnn1)
     # flat = Flatten()(cnn3)
     # drop = Dropout(0.5)(flat)
-    fc = Dense(256)(rl)
+    fc = Dense(64)(rl)
 
     main_output = Dense(8, activation='softmax')(rl)
     model = Model(inputs=main_input, outputs=main_output)
@@ -92,15 +92,8 @@ def main(train_path, test_path, train_n, test_n):
     test = pd.read_csv(test_path, nrows=test_n)
     outfiles = test.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
     outlabels = test[['file_id', 'label']].drop_duplicates().label.tolist()
-    # file_names = test2
     files = train.groupby('file_id')['api'].apply(lambda x: ' '.join(x)).reset_index()['api'].tolist()
-    # print(files)
-    # print(np.shape(files))
-    # labels = train.groupby(['file_id', 'label'])['label'].reset_index()
     labels = train[['file_id', 'label']].drop_duplicates().label.tolist()
-    # print(labels)
-    # print(np.shape(labels))
-    # labels = train.groupby('file_id')['label'].apply(lambda x: ''.join(x)).reset_index()
     # enumerate用
     labels_d = labels.copy()
 
@@ -112,8 +105,10 @@ def main(train_path, test_path, train_n, test_n):
     #
 
     labels = np.asarray(labels)
+    # print(labels)
     # 将类别向量转换为二进制
     labels = to_categorical(labels, num_classes=8)
+    # print(labels)
 
     tokenizer = Tokenizer(num_words=None,
                           filters='!"#$%&()*+,-./:;<=>?@[\]^_`{|}~',
@@ -123,20 +118,21 @@ def main(train_path, test_path, train_n, test_n):
                           lower=False)
     tokenizer.fit_on_texts(files)
     tokenizer.fit_on_texts(outfiles)
+    # print(tokenizer.word_docs)
 
     # with open("wordsdic.pkl", 'wb') as f:
     #     pickle.dump(tokenizer, f)
 
-    vocab = tokenizer.word_index
-    print(vocab)
-    print(len(vocab))
+    # vocab = tokenizer.word_index
+    # print(vocab)
+    # print(len(vocab))
     x_train_word_ids = tokenizer.texts_to_sequences(files)
     x_out_word_ids = tokenizer.texts_to_sequences(outfiles)
-
+    # print(x_train_word_ids)
     x_train_padded_seqs = pad_sequences(x_train_word_ids, maxlen=maxlen)
-
     x_out_padded_seqs = pad_sequences(x_out_word_ids, maxlen=maxlen)
-    meta_train = np.zeros(shape=(len(x_train_padded_seqs), 8))
+    # print(x_train_padded_seqs)
+    meta_train = np.zeros(shape= (len(x_train_padded_seqs), 8))
     meta_test = np.zeros(shape=(len(x_out_padded_seqs), 8))
     skf = StratifiedKFold(n_splits=5, random_state=4, shuffle=True)
     for i, (tr_ind, te_ind) in enumerate(skf.split(x_train_padded_seqs, labels_d)):
@@ -188,10 +184,10 @@ def main(train_path, test_path, train_n, test_n):
     #     pickle.dump(meta_train, f)
     #     pickle.dump(meta_test, f)
 if __name__ == '__main__':
-    path = './data/security_train.csv'
+    path = './security_train/security_train.csv'
     path1 = './security_train/security_train.csv'
-    path2 = './data/security_test.csv'
-    main(path, path2, 20000000, 10000000)
+    path2 = './security_train/security_test.csv'
+    main(path, path, 2000000, 200000)
 
     # result = model.predict(x_out_padded_seqs)
     # out = []
